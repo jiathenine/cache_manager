@@ -3,9 +3,6 @@ import warnings
 import types
 
 
-
-
-
 def verify_rules(params, ruleset):
     for key, types, message in ruleset:
         if key in params:
@@ -47,7 +44,7 @@ def format_cache_config_options(config, include_default):
     _options_mid = {}
     for key, value in config.iteritems():
         splits = key.split('.')
-        assert 3 >= splits >0
+        assert 3 >= splits > 0
         _options_mid[splits] = value
 
 
