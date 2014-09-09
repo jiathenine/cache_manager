@@ -1,7 +1,13 @@
 __author__ = 'jia'
 import warnings
 import types
+from string import replace
+import hashlib
+import sys
+import os
 
+default_hash = hashlib.sha1
+default_hash_len = len(default_hash().hexdigest())
 
 def verify_rules(params, ruleset):
     for key, types, message in ruleset:
@@ -10,42 +16,102 @@ def verify_rules(params, ruleset):
     return params
 
 
+class CompressionInt(object):
+    use_symbol = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
 
-def coerce_cache_params(params):
-    rules = [
-        ('data_dir', (str, types.NoneType), "data_dir must be a string "
-         "referring to a directory."),
-        ('lock_dir', (str, types.NoneType), "lock_dir must be a string referring to a "
-         "directory."),
-        ('type', (str,), "Cache type must be a string."),
-        ('enabled', (bool, types.NoneType), "enabled must be true/false "
-         "if present."),
-        ('expire', (int, types.NoneType), "expire must be an integer representing "
-         "how many seconds the cache is valid for"),
-        ('regions', (list, tuple, types.NoneType), "Regions must be a "
-         "comma seperated list of valid regions"),
-        ('key_length', (int, types.NoneType), "key_length must be an integer "
-         "which indicates the longest a key can be before hashing"),
-    ]
-    return verify_rules(params, rules)
+    def __init__(self, symbols=use_symbol):
+        assert not '-' in symbols
+        self.use_symbol = symbols
+        self.symbol_len = len(self.use_symbol)
+
+    def __call__(self, num):
+        rst = ""
+        if num < 0:
+            num = abs(num)
+            rst = '-'
+        while num:
+            re = num % self.symbol_len
+            rst += self.use_symbol[re]
+            num /= self.symbol_len
+        return rst
+
+    def reverse(self, data):
+        num = 0
+        if data and data[0] == '-':
+            data = data[:0:-1]
+            pn = -1
+        else:
+            data = data[::-1]
+            pn = 1
+        for s in data:
+            f = self.use_symbol.find(s)
+            if f != -1:
+                num = num * self.symbol_len + f
+        return num * pn
 
 
-def format_cache_config_options(config, include_default):
-    """
+def __get_cache(namespace, key_args, max_key_length):
+    format_key = str(key_args)
+    format_key_length = len(format_key)
+    namespace_length = len(namespace)
+    if format_key_length + namespace_length > max_key_length:
+        if namespace_length + default_hash_len > max_key_length:
+            return default_hash(str(namespace) + format_key)
+        return namespace + default_hash(format_key)
+    return namespace + format_key
 
-    """
-    # warnings.warn("the old_format_cache_config_options func is deprecated; use format_cache_config_options instead",
-    #             DeprecationWarning, 2)
 
-    if include_default:
-        options = dict(type='memory', data_dir=None, expire=None, log_file=None, enable=True)
+def get_cache(namespace, key_args, max_key_length=256):
+    return __get_cache(namespace, key_args, max_key_length).replace(' ', '_')
+
+
+def is_global(obj):
+    mod = obj.__module__
+    __import__(mod)
+    module = sys.modules(mod)
+    return hasattr(module, obj.__name__)
+
+
+def get_module_name(module):
+    return os.path.realpath(module)
+
+
+def get_func_name(func):
+    if is_global(func):
+        return func.__name__
     else:
-        options = {}
-    _options_mid = {}
-    for key, value in config.iteritems():
-        splits = key.split('.')
-        assert 3 >= splits > 0
-        _options_mid[splits] = value
+        return CompressionInt(hash(func.func_code.co_code))
 
 
-    coerce_cache_params(options)
+def im_func_name(func):
+    im_class = func.im_class
+    if is_global(im_class):
+        return '%s.%s' % (im_class.__name__, func.__name__)
+    else:
+        assert 0
+
+
+def create_namespace(func):
+    module = func.__module__
+    module_name = get_module_name(module)
+    if isinstance(func, types.MethodType):
+        func_name = im_func_name(func)
+    else:
+        func_name = get_func_name(func)
+    return '%s|%s' % (module, func_name)
+
+
+try:
+    import threading
+
+except Exception, what:
+    print 'Warning: import threading model failure'
+
+    def async(func, *args, **kwargs):
+        func(*args, **kwargs)
+
+else:
+    def async(func, *args, **kwargs):
+        t = threading.Thread(target=func, args=args, kwargs=kwargs)
+        t.setDaemon(True)
+        t.start()

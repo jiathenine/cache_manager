@@ -5,43 +5,42 @@ MAX_KEY_LENGTH = 250
 
 
 class PyLibMcNamespaceManager(object):
-    def __init__(self, *arg, **kw):
+    def __init__(self, timeout, *arg, **kw):
+        self.timeout = timeout
         self.mc = pylibmc.Client(*arg, **kw)
         self.pool = pylibmc.ThreadMappedPool(self.mc)
 
-    def _format_key(self, key):
-        if not isinstance(key, str):
-            key = key.decode('ascii')
-        formated_key = (self.namespace + '_' + key).replace(' ', '\302\267')
-        if len(formated_key) > MAX_KEY_LENGTH:
-            formated_key = hashlib.sha1(formated_key).hexdigest()
-        return formated_key
-
     def __getitem__(self, key):
-        with self.pool.reserve() as mc:
-            return mc.get(self._format_key(key))
+        v = self.get(key)
+        if v is None:
+            raise KeyError()
+        return v
 
     def __contains__(self, key):
         with self.pool.reserve() as mc:
-            value = mc.get(self._format_key(key))
+            value = mc.get(key)
             return value is not None
 
     def has_key(self, key):
         return key in self
 
-    def set_value(self, key, value, expiretime=None):
+    def get(self, key):
         with self.pool.reserve() as mc:
-            if expiretime:
-                mc.set(self._format_key(key), value, time=expiretime)
+            return mc.get(key)
+
+    def set(self, key, value):
+        with self.pool.reserve() as mc:
+            if self.timeout:
+                mc.set(key, value, self.timeout)
             else:
-                mc.set(self._format_key(key), value)
+                mc.set(key, value)
 
     def __setitem__(self, key, value):
         self.set_value(key, value)
 
     def __delitem__(self, key):
         with self.pool.reserve() as mc:
-            mc.delete(self._format_key(key))
+            mc.delete(key)
 
     def do_remove(self):
         with self.pool.reserve() as mc:
@@ -59,4 +58,4 @@ class PyLibMcNamespaceManager(object):
         :return: a null list
         """
         with self.pool.reserve() as mc:
-            return mc.set(kwargs.update(_dict))
+            return mc.set_multi(kwargs.update(_dict))
