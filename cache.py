@@ -5,8 +5,6 @@ import types
 from ext import libmc
 import util
 
-
-
 region_config = {}
 
 

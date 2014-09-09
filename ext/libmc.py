@@ -1,7 +1,5 @@
 __author__ = 'jia'
 import pylibmc
-import hashlib
-MAX_KEY_LENGTH = 250
 
 
 class PyLibMcNamespaceManager(object):
@@ -58,4 +56,4 @@ class PyLibMcNamespaceManager(object):
         :return: a null list
         """
         with self.pool.reserve() as mc:
-            return mc.set_multi(kwargs.update(_dict))
+            return mc.set_multi(kwargs.update(_dict), self.timeout)
