@@ -9,12 +9,6 @@ import os
 default_hash = hashlib.sha1
 default_hash_len = len(default_hash().hexdigest())
 
-def verify_rules(params, ruleset):
-    for key, types, message in ruleset:
-        if key in params:
-            params[key] = verify_options(params[key], types, message)
-    return params
-
 
 class CompressionInt(object):
     use_symbol = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
@@ -88,6 +82,7 @@ def im_func_name(func):
     if is_global(im_class):
         return '%s.%s' % (im_class.__name__, func.__name__)
     else:
+        #so hard
         assert 0
 
 

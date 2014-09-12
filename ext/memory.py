@@ -1,12 +1,14 @@
 __author__ = 'Leo'
 import datetime
+from threading import RLock
 
 
 class MemoryNamespaceManager(object):
 
-    def __init__(self, timeout):
+    def __init__(self, timeout, *args):
         self.timeout = timeout
         self.data = {}
+        self.lock = RLock()
         self.overtime = {}
 
     def __getitem__(self, key):
@@ -20,8 +22,21 @@ class MemoryNamespaceManager(object):
         return self.data.__contains__(key)
 
     def __delitem__(self, key):
-        del self.data[key]
-        del self.overtime[key]
+        self.lock.acquire()
+        try:
+            del self.data[key]
+            del self.overtime[key]
+        finally:
+            self.lock.release()
+
+    def __setitem__(self, key, value):
+        self.lock.acquire()
+        try:
+            overtime = datetime.datetime.now() + datetime.timedelta(seconds=self.timeout)
+            self.overtime[key] = overtime
+            return self.data.__setitem__(key, value)
+        finally:
+            self.lock.release()
 
     def has_key(self, key):
         return key in self
@@ -32,11 +47,6 @@ class MemoryNamespaceManager(object):
             self.__delitem__(key)
             return None
         return vt
-
-    def __setitem__(self, key, value):
-        overtime = datetime.datetime.now() + datetime.timedelta(seconds=self.timeout)
-        self.overtime[key] = overtime
-        return self.data.__setitem__(key, value)
 
     def set(self, key, value):
         return self.__setitem__(key, value)
@@ -64,8 +74,12 @@ class MemoryNamespaceManager(object):
         :param kwargs: It has __str__ function object or base type
         :return: a null list
         """
-        overtime = datetime.datetime.now() + datetime.timedelta(seconds=self.timeout)
-        kwargs.update(_dict)
-        self.overtime.update({k: overtime for k in kwargs.keys()})
-        self.data.update(kwargs)
-        return 1
+        self.lock.acquire()
+        try:
+            overtime = datetime.datetime.now() + datetime.timedelta(seconds=self.timeout)
+            kwargs.update(_dict)
+            self.overtime.update({k: overtime for k in kwargs.keys()})
+            self.data.update(kwargs)
+            return 1
+        finally:
+            self.lock.release()

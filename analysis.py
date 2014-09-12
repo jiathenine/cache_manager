@@ -1,16 +1,19 @@
 __author__ = 'jia'
 import types
 import re
-
+from ext import rule
+from cache import CacheManager
 
 def coerce_cache_params(params):
     rules = {
-        '*.type': {'$in': ('memory', 'memcached', 'pylibmc')},
-        '*.key': {'type': basestring},
-        '*.expire': {'type': int},
-        '*.url': {'type': basestring},
+        '*.type': {'$in': CacheManager.region_map.keys()},
+        '*.key': {'$type': basestring},
+        '*.expire': {'$type': int},
+        '*.url': {'$type': basestring},
     }
-    # return verify_rules(params, rules)
+    over_values = rule.check_targets_rule(rules, params)
+    if over_values:
+        raise ValueError(str(over_values))
 
 
 def format_cache_config_options(config):
@@ -28,6 +31,5 @@ def format_cache_config_options(config):
         if not _options_mid.has_key(region):
             _options_mid[region] = {}
         _options_mid[region][attr] = value
-
-
     coerce_cache_params(_options_mid)
+    return _options_mid

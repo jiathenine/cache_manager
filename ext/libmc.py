@@ -3,9 +3,9 @@ import pylibmc
 
 
 class PyLibMcNamespaceManager(object):
-    def __init__(self, timeout, *arg, **kw):
+    def __init__(self, timeout, url, *arg):
         self.timeout = timeout
-        self.mc = pylibmc.Client(*arg, **kw)
+        self.mc = pylibmc.Client([url])
         self.pool = pylibmc.ThreadMappedPool(self.mc)
 
     def __getitem__(self, key):

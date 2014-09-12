@@ -2,7 +2,9 @@ __author__ = 'jia'
 import beaker.cache
 import inspect
 import types
+
 from ext import libmc
+from ext import memory
 import util
 
 region_config = {}
@@ -15,6 +17,7 @@ class CacheManager(object):
     region_map = {
         'memcached': libmc.PyLibMcNamespaceManager,
         'pylibmc': libmc.PyLibMcNamespaceManager,
+        'memory': memory.MemoryNamespaceManager,
     }
 
     def __init__(self):
@@ -24,7 +27,7 @@ class CacheManager(object):
         if region not in self.db:
             if region not in self.region_map:
                 raise KeyError('%s database is not found' % region)
-            self.db[region] = self.region_map[region]()
+            self.db[region] = self.region_map[region](region_config[region]['expire'], region_config[region]['url'])
 
 
 def is_mem_func(func):
